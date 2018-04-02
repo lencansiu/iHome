@@ -1,14 +1,13 @@
 # -*- coding:utf-8 -*-
 
 
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 import redis
-from flask_wtf.csrf import CSRFProtect
+from flask import Flask
 # session在flask中的扩展包
 from flask_session import Session
+from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from config import configs
-from iHome.index import api
 
 
 # 创建可以被外界导入的数据库连接对象
@@ -40,7 +39,8 @@ def get_app(config_name):
     # 使用session在flask扩展实现将session数据存储在redis
     Session(app)
 
-    # 注册蓝图
+    # 注册蓝图：为了解决导入api时，还没有redis_store，造成的ImportError: cannot import name redis_store
+    from iHome.api_1_0 import api
     app.register_blueprint(api)
 
     return app
