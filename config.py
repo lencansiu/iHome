@@ -5,7 +5,7 @@ import redis
 
 
 class Config(object):
-    """加载配置 所有的配置信息都写在这个类里面"""
+    """加载配置"""
 
     # 开启调试模式
     DEBUG = True
@@ -27,5 +27,34 @@ class Config(object):
     SESSION_REDIS = redis.StrictRedis(host=REDIS_HOST, port=REDIS_PORT)
     # 开启session数据的签名，意思是让session数据不以明文形式存储
     SESSION_USE_SIGNER = True
-    # 設置session的会话的超时时长 ：一天
+    # 设置session的会话的超时时长 ：一天
     PERMANENT_SESSION_LIFETIME = 3600 * 24
+
+
+class DevelopmentConfig(Config):
+    """创建调试环境下的配置类"""
+    # 爱家租房的房型，调试模式的配置和Config一致，所以pass
+    pass
+
+
+class ProductionConfig(Config):
+    """创建线上环境下的配置类"""
+
+    # 重写有差异性的配置
+    SQLALCHEMY_DATABASE_URI = 'mysql://root:mysql@192.168.72.77:3306/iHome'
+
+
+class UnittestConfig(Config):
+    """单元测试的配置"""
+
+    # 重写有差异性的配置
+    SQLALCHEMY_DATABASE_URI = 'mysql://root:mysql@127.0.0.1:3306/iHome_testcast_07'
+
+
+# 准备工厂设计模式的原材料
+configs = {
+    'default_config': Config,
+    'development': DevelopmentConfig,
+    'production': ProductionConfig,
+    'unittest': UnittestConfig
+    }
