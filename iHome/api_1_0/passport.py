@@ -9,6 +9,20 @@ from iHome.utils.response_code import RET
 from iHome import redis_store, db
 from iHome.models import User
 import re
+from iHome.utils.common import login_required
+
+
+@api.route('/sessions', methods=['DELETE'])
+@login_required
+def logout():
+    """提供退出登录"""
+
+    # 1.清理session数据
+    session.pop('user_id')
+    session.pop('name')
+    session.pop('mobile')
+
+    return jsonify(errno=RET.OK, errmsg='退出登录成功')
 
 
 @api.route('/sessions', methods=['POST'])
