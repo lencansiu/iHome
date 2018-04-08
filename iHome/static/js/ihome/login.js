@@ -10,11 +10,15 @@ $(document).ready(function() {
     $("#password").focus(function(){
         $("#password-err").hide();
     });
+
     // TODO: 添加登录表单提交操作
     $(".form-login").submit(function(e){
         e.preventDefault();
+
+        // 读取数据
         mobile = $("#mobile").val();
         passwd = $("#password").val();
+
         if (!mobile) {
             $("#mobile-err span").html("请填写正确的手机号！");
             $("#mobile-err").show();
@@ -25,5 +29,27 @@ $(document).ready(function() {
             $("#password-err").show();
             return;
         }
+
+        var params = {
+            'mobile':mobile,
+            'password':passwd
+        };
+
+        // 发送登录请求
+        $.ajax({
+            url:'/api/1.0/sessions',
+            type:'post',
+            data:JSON.stringify(params),
+            contentType:'application/json',
+            headers:{'X-CSRFToken':getCookie('csrf_token')},
+            success:function (response) {
+                if (response.errno =='0') {
+                    // 登录成功进入到主页
+                    location.href = '/';
+                } else {
+                    alert(response.errmsg)
+                }
+            }
+        });
     });
-})
+});
