@@ -7,8 +7,72 @@ from iHome.models import Area, House, Facility, HouseImage
 from flask import current_app, jsonify, request, g, session
 from iHome.utils.response_code import RET
 from iHome.utils.common import login_required
-from iHome import db, constants
+from iHome import db, constants, redis_store
 from iHome.utils.image_storage import upload_image
+
+
+# http://127.0.0.1:5000/search.html?aid=2&aname=&sd=&ed=&p=
+@api.route('/houses/search')
+def get_houses_search():
+    """搜索房屋列表
+    1.查询所有的房屋信息
+    2.构造响应数据
+    3.响应结果
+    """
+
+    # 获取地区参数
+    aid = request.args.get('aid')
+
+    # 查询所有的房屋信息 houses == [House,House,House,...]
+    try:
+        # 无条件查询所有房屋数据
+        # houses = House.query.all()
+
+        # 得到BaseQuery对象，保存即将要查询出来的数据
+        house_query = House.query
+
+        # 根据用户选中的城区信息，筛选出满足条件的房屋信息
+        if aid:
+            house_query = house_query.filter(House.area_id == aid)
+
+        # 无条件的从BaseQuery对象中取出数据
+        houses = house_query.all()
+
+    except Exception as e:
+        current_app.logger.error(e)
+        return jsonify(errno=RET.DBERR, errmsg='查询房屋信息失败')
+
+    # 2.构造响应数据
+    house_dict_list = []
+    for house in houses:
+        house_dict_list.append(house.to_basic_dict())
+
+    # 3.响应结果
+    return jsonify(errno=RET.OK, errmsg='OK', data=house_dict_list)
+
+
+@api.route('/houses/index')
+def get_house_index():
+    """提供房屋最新的推荐
+    1.查询最新发布的五个房屋信息,（按照时间排倒序）
+    2.构造响应数据
+    3.响应结果
+    """
+
+    # 1.查询最新发布的五个房屋信息 houses == [House, House, House, ...]
+    try:
+        houses = House.query.order_by(House.create_time.desc()).limit(constants.HOME_PAGE_MAX_HOUSES)
+    except Exception as e:
+        current_app.logger.error(e)
+        return jsonify(errno=RET.DBERR, errmsg='查询房屋数据失败')
+
+    # 2.构造响应数据
+    house_dict_list = []
+    for house in houses:
+        house_dict_list.append(house.to_basic_dict())
+
+    # 3.响应结果
+    return jsonify(errno=RET.OK, errmsg='OK', data=house_dict_list)
 
 
 @api.route('/houses/detail/<int:house_id>')
@@ -185,6 +249,14 @@ def get_areas():
     3.响应结果
     """
 
+    # 查询缓存数据，如果有缓存数据，就使用缓存数据，反之，就查询，并缓存新查询的数据
+    try:
+        area_dict_list = redis_store.get('Areas')
+        if area_dict_list:
+            return jsonify(errno=RET.OK, errmsg='OK', data=eval(area_dict_list))
+    except Exception as e:
+        current_app.logger.error(e)
+
     # 1.查询所有的城区信息 areas == [Area,Area,Area,...]
     try:
         areas = Area.query.all()
@@ -196,6 +268,12 @@ def get_areas():
     area_dict_list = []
     for area in areas:
         area_dict_list.append(area.to_dict())
+
+    # 缓存城区信息到redis : 没有缓存成功也没有影响，因为前面会判断和查询
+    try:
+        redis_store.set('Areas', area_dict_list, constants.AREA_INFO_REDIS_EXPIRES)
+    except Exception as e:
+        current_app.logger.error(e)
 
     # 3.响应结果
     return jsonify(errno=RET.OK, errmsg='OK', data=area_dict_list)
