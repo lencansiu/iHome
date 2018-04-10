@@ -20,10 +20,23 @@ def get_houses_search():
     3.响应结果
     """
 
+    current_app.logger.debug(request.args)
+
     # 获取地区参数
     aid = request.args.get('aid')
+    # 获取排序参数: new:最新，按照发布时间倒序; booking:订单量，安装订单量倒序；price-inc 价格低到高；price-des 价格高到低
+    sk = request.args.get('sk')
+    # 获取用户传入的页码
+    p = request.args.get('p')
 
-    # 查询所有的房屋信息 houses == [House,House,House,...]
+    # 校验参数
+    try:
+        p = int(p)
+    except Exception as e:
+        current_app.logger.error(e)
+        return jsonify(errno=RET.PARAMERR, errmsg='参数有误')
+
+    # 1.查询所有的房屋信息 houses == [House,House,House,...]
     try:
         # 无条件查询所有房屋数据
         # houses = House.query.all()
@@ -35,8 +48,26 @@ def get_houses_search():
         if aid:
             house_query = house_query.filter(House.area_id == aid)
 
+        # 根据排序规则对数据进行排序
+        if sk == 'booking':
+            house_query = house_query.order_by(House.order_count.desc())
+        elif sk == 'price-inc':
+            house_query = house_query.order_by(House.price.asc())
+        elif sk == 'price-des':
+            house_query = house_query.order_by(House.price.desc())
+        else:
+            house_query = house_query.order_by(House.create_time.desc())
+
         # 无条件的从BaseQuery对象中取出数据
-        houses = house_query.all()
+        # houses = house_query.all()
+
+        # 需要使用分页功能，避免一次性查询所有数据，使用分页代码，替换all()
+        # 每页两条数据 paginate == 一本书，书里面有好多页
+        paginate = house_query.paginate(p, constants.HOUSE_LIST_PAGE_CAPACITY, False)
+        # 获取当前页的房屋模型对象 houses == [House, House],
+        houses = paginate.items
+        # 获取一共分了多少页，一定要传给前端
+        total_page = paginate.pages
 
     except Exception as e:
         current_app.logger.error(e)
@@ -46,6 +77,12 @@ def get_houses_search():
     house_dict_list = []
     for house in houses:
         house_dict_list.append(house.to_basic_dict())
+
+    # 提示：如果重新构造了响应数据，需要把之前前端界面的house_dict_list的获取修改一下response.data.houses
+    response_data = {
+        'houses': house_dict_list,
+        'total_page': total_page
+    }
 
     # 3.响应结果
     return jsonify(errno=RET.OK, errmsg='OK', data=house_dict_list)
